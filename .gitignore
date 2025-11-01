@@ -1,0 +1,7 @@
+# Ignore large files and temporary data
+*.npz
+*.pkl
+*.npy
+*.pt
+*.pth
+/data/
