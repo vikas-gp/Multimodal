@@ -14,33 +14,41 @@ def preprocess_image(img_path, size=(224, 224), is_gray=False):
         img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
     else:
         img = cv2.imread(img_path, cv2.IMREAD_COLOR)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert from BGR (OpenCV) to RGB
-
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert from BGR to RGB
+    print(f"Loaded image {img_path}")
     img_resized = cv2.resize(img, size, interpolation=cv2.INTER_LANCZOS4)
+    print(f"Resized image {img_path}")
     img_norm = normalize_image(img_resized)
+    print(f"Normalized image {img_path}")
     return img_norm
 
 def skeleton_image_to_graph(skel_img):
     skel_bin = (skel_img > 0).astype(np.uint8)
+    print("Binarized skeleton image")
     skel_thinned = skeletonize(skel_bin)
-
+    print("Skeletonized image")
     coords = np.column_stack(np.where(skel_thinned))
     G = nx.Graph()
     for idx, (y, x) in enumerate(coords):
         G.add_node(idx, pos=(x, y))
     for idx1, (y1, x1) in enumerate(coords):
         for idx2, (y2, x2) in enumerate(coords):
-            if idx1 != idx2 and abs(x1-x2) <= 1 and abs(y1-y2) <= 1:
+            if idx1 != idx2 and abs(x1 - x2) <= 1 and abs(y1 - y2) <= 1:
                 G.add_edge(idx1, idx2)
+    print("Constructed graph from skeleton")
     return G
 
 def preprocess_dataset(paired_samples, image_size=(224, 224)):
     dataset = []
+    print("Starting dataset preprocessing...")
     for sample in paired_samples:
+        print(f"Processing sample {sample['base_name']}")
         leaf_arr = preprocess_image(sample['leaf_path'], size=image_size, is_gray=False)
         veins_arr = preprocess_image(sample['veins_path'], size=image_size, is_gray=False)
         skeleton_arr = preprocess_image(sample['skeleton_path'], size=image_size, is_gray=True)
-        skeleton_graph = skeleton_image_to_graph(cv2.resize(cv2.imread(sample['skeleton_path'], cv2.IMREAD_GRAYSCALE), image_size, interpolation=cv2.INTER_LANCZOS4))
+        skeleton_graph = skeleton_image_to_graph(
+            cv2.resize(cv2.imread(sample['skeleton_path'], cv2.IMREAD_GRAYSCALE), image_size, interpolation=cv2.INTER_LANCZOS4)
+        )
 
         dataset.append({
             'leaf_img': leaf_arr,
@@ -49,10 +57,12 @@ def preprocess_dataset(paired_samples, image_size=(224, 224)):
             'skeleton_graph': skeleton_graph,
             'base_name': sample['base_name']
         })
+    print("Finished preprocessing dataset.")
     return dataset
 
 def load_paired_dataset(leaf_dir, veins_rgb_dir, skeleton_dir):
     paired_samples = []
+    print("Loading dataset files...")
     leaf_files = [f for f in os.listdir(leaf_dir) if f.lower().endswith('.jpg')]
     leaf_files.sort()
 
@@ -92,12 +102,11 @@ def load_paired_dataset(leaf_dir, veins_rgb_dir, skeleton_dir):
     print(f"Paired samples loaded: {len(paired_samples)}")
     return paired_samples
 
-
 # Main execution
 if __name__ == "__main__":
-    leaf_dir = r"D:\Multimodal\leaf"
-    veins_rgb_dir = r"D:\Multimodal\veins_rgb"
-    skeleton_dir = r"D:\Multimodal\skeleton"
+    leaf_dir = "/teamspace/studios/this_studio/Multimodal/leaf"
+    veins_rgb_dir = "/teamspace/studios/this_studio/Multimodal/veins_rgb"
+    skeleton_dir = "/teamspace/studios/this_studio/Multimodal/skeleton"
 
     paired_samples = load_paired_dataset(leaf_dir, veins_rgb_dir, skeleton_dir)
     preprocessed_data = preprocess_dataset(paired_samples, image_size=(224, 224))
