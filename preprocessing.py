@@ -4,6 +4,8 @@ import numpy as np
 import networkx as nx
 import pickle
 from skimage.morphology import skeletonize
+import torch
+from torch_geometric.data import Data
 
 def normalize_image(img):
     arr = img.astype(np.float32) / 255.0
@@ -38,6 +40,52 @@ def skeleton_image_to_graph(skel_img):
     print("Constructed graph from skeleton")
     return G
 
+def nx_to_pyg_data(G):
+    node_feats = []
+
+    # Compute graph center
+    xs = [G.nodes[n].get('pos', (0, 0))[0] for n in G.nodes]
+    ys = [G.nodes[n].get('pos', (0, 0))[1] for n in G.nodes]
+    center_x, center_y = np.mean(xs), np.mean(ys)
+
+    for n in G.nodes:
+        x, y = G.nodes[n].get('pos', (0, 0))
+        deg = G.degree[n]
+        branch = 1 if deg > 2 else 0
+
+        dist_center = np.sqrt((x - center_x)**2 + (y - center_y)**2)
+
+        neighbors = list(G.neighbors(n))
+        if neighbors:
+            lengths = []
+            for nb in neighbors:
+                px, py = G.nodes[nb].get('pos', (0, 0))
+                lengths.append(np.sqrt((x - px)**2 + (y - py)**2))
+            mean_length = np.mean(lengths)
+        else:
+            mean_length = 0.0
+
+        angles = []
+        for nb in neighbors:
+            px, py = G.nodes[nb].get('pos', (0, 0))
+            angles.append(np.arctan2(py - y, px - x))
+        mean_angle = np.mean(angles) if angles else 0.0
+
+        node_feats.append([
+            x, y, deg, branch,
+            dist_center,
+            mean_length,
+            mean_angle
+        ])
+
+    x = torch.tensor(node_feats, dtype=torch.float32)
+
+    edges = list(G.edges)
+    edges += [(v, u) for u, v in edges]
+    edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous()
+
+    return Data(x=x, edge_index=edge_index)
+
 def preprocess_dataset(paired_samples, image_size=(224, 224)):
     dataset = []
     print("Starting dataset preprocessing...")
@@ -46,9 +94,8 @@ def preprocess_dataset(paired_samples, image_size=(224, 224)):
         leaf_arr = preprocess_image(sample['leaf_path'], size=image_size, is_gray=False)
         veins_arr = preprocess_image(sample['veins_path'], size=image_size, is_gray=False)
         skeleton_arr = preprocess_image(sample['skeleton_path'], size=image_size, is_gray=True)
-        skeleton_graph = skeleton_image_to_graph(
-            cv2.resize(cv2.imread(sample['skeleton_path'], cv2.IMREAD_GRAYSCALE), image_size, interpolation=cv2.INTER_LANCZOS4)
-        )
+        skel_img = cv2.resize(cv2.imread(sample['skeleton_path'], cv2.IMREAD_GRAYSCALE), image_size, interpolation=cv2.INTER_LANCZOS4)
+        skeleton_graph = skeleton_image_to_graph(skel_img)
 
         dataset.append({
             'leaf_img': leaf_arr,
@@ -102,17 +149,15 @@ def load_paired_dataset(leaf_dir, veins_rgb_dir, skeleton_dir):
     print(f"Paired samples loaded: {len(paired_samples)}")
     return paired_samples
 
-# Main execution
 if __name__ == "__main__":
-    leaf_dir = "/teamspace/studios/this_studio/Multimodal/leaf"
-    veins_rgb_dir = "/teamspace/studios/this_studio/Multimodal/veins_rgb"
-    skeleton_dir = "/teamspace/studios/this_studio/Multimodal/skeleton"
+    leaf_dir = r"D:\Multimodal\leaf"
+    veins_rgb_dir = r"D:\Multimodal\veins_rgb"
+    skeleton_dir = r"D:\Multimodal\skeleton"
 
     paired_samples = load_paired_dataset(leaf_dir, veins_rgb_dir, skeleton_dir)
     preprocessed_data = preprocess_dataset(paired_samples, image_size=(224, 224))
     print(f"Total preprocessed samples: {len(preprocessed_data)}")
 
-    # Save preprocessed images
     np.savez('preprocessed_images.npz',
              leaf_imgs=np.array([d['leaf_img'] for d in preprocessed_data]),
              veins_imgs=np.array([d['veins_img'] for d in preprocessed_data]),
@@ -120,7 +165,6 @@ if __name__ == "__main__":
              base_names=[d['base_name'] for d in preprocessed_data]
     )
 
-    # Save skeleton graphs as pickled objects
     with open('skeleton_graphs.pkl', 'wb') as f:
         pickle.dump([d['skeleton_graph'] for d in preprocessed_data], f)
 
