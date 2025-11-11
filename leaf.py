@@ -227,7 +227,7 @@ def train_kfold(root_dir, epochs=25, batch_size=32, n_splits=5):
 # ============================================================
 if __name__ == "__main__":
     train_kfold(
-        root_dir=r"D:\Multimodal\leaf",
+        root_dir=r"/teamspace/studios/this_studio/Multimodal/leaf",
         epochs=25,
         batch_size=32,
         n_splits=5

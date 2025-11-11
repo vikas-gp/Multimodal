@@ -6,8 +6,8 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import accuracy_score, precision_score, f1_score
 
 # Load vein features and labels
-vein_features = np.load('vein_features.npy')   # Shape: (N, feature_dim)
-labels = np.load('labels.npy')                  # Shape: (N,)
+vein_features = np.load('/teamspace/studios/this_studio/Multimodal/vein_features.npy')   # Shape: (N, feature_dim)
+labels = np.load('/teamspace/studios/this_studio/Multimodal/labels.npy')                  # Shape: (N,)
 
 # Convert to torch tensors
 X = torch.tensor(vein_features, dtype=torch.float32)
