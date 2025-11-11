@@ -1,0 +1,4 @@
+===== Multimodal Classifier Final Results =====
+Mean Accuracy:  0.7974
+Mean Precision: 0.8015
+Mean F1 Score:  0.7937
