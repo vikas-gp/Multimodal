@@ -1,0 +1,4 @@
+===== FINAL VEIN MODEL METRICS =====
+Mean Accuracy:  0.8462
+Mean Precision: 0.8576
+Mean F1 Score:  0.8463

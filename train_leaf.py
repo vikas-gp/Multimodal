@@ -10,9 +10,9 @@ from PIL import Image
 import numpy as np
 
 # ============================================================
-#                  Custom Dataset (Vein Only)
+#                  Custom Dataset (Leaf Only)
 # ============================================================
-class VeinDataset(Dataset):
+class LeafDataset(Dataset):
     def __init__(self, img_paths, labels, transform=None):
         self.img_paths = img_paths
         self.labels = labels
@@ -28,26 +28,25 @@ class VeinDataset(Dataset):
             img = self.transform(img)
         return img, label
 
-
 # ============================================================
-#                    Vein Model (Frozen)
+#                    Leaf Model (Frozen)
 # ============================================================
-class VeinFrozenModel(nn.Module):
+class LeafFrozenModel(nn.Module):
     def __init__(self, num_classes):
-        super(VeinFrozenModel, self).__init__()
+        super(LeafFrozenModel, self).__init__()
 
-        # 1️⃣ Pretrained DenseNet121 backbone
+        # 1️⃣ Load pretrained DenseNet121
         self.base = models.densenet121(weights=models.DenseNet121_Weights.DEFAULT)
-        self.base.classifier = nn.Identity()
+        self.base.classifier = nn.Identity()  # remove classifier head
 
-        # Freeze all DenseNet layers
+        # Freeze all backbone layers
         for param in self.base.parameters():
             param.requires_grad = False
 
-        # 2️⃣ Global Average Pooling
+        # 2️⃣ Add Global Average Pooling
         self.gap = nn.AdaptiveAvgPool2d((1, 1))
 
-        # 3️⃣ Classifier (Two FC layers + Output)
+        # 3️⃣ Add Classifier (Two FC layers + Output)
         self.classifier = nn.Sequential(
             nn.Linear(1024, 512),
             nn.ReLU(),
@@ -61,14 +60,13 @@ class VeinFrozenModel(nn.Module):
     def forward(self, x):
         x = self.base.features(x)
         x = self.gap(x)
-        x = torch.flatten(x, 1)  # [batch, 1024]
+        x = torch.flatten(x, 1)   # shape → [batch, 1024]
         return self.classifier(x)
 
-
 # ============================================================
-#                Helper: Load Vein Dataset
+#                Helper: Load Dataset (from Folder)
 # ============================================================
-def load_vein_dataset(root_dir):
+def load_leaf_dataset(root_dir):
     classes = ['healthy', 'Nitrogen', 'Potassium', 'Phosphorus', 'Sulphur', 'Zinc']
     class_to_idx = {cls.lower(): i for i, cls in enumerate(classes)}
 
@@ -85,17 +83,15 @@ def load_vein_dataset(root_dir):
                 raise ValueError(f"Class not found in filename: {fname}")
             img_paths.append(os.path.join(root_dir, fname))
             labels.append(label)
-
     return np.array(img_paths), np.array(labels), classes
 
-
 # ============================================================
-#                   K-Fold Training
+#                   Train with K-Fold
 # ============================================================
-def train_vein_frozen(root_dir, epochs=25, batch_size=32, n_splits=5):
+def train_leaf_frozen(root_dir, epochs=25, batch_size=32, n_splits=5):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    img_paths, labels, class_names = load_vein_dataset(root_dir)
+    img_paths, labels, class_names = load_leaf_dataset(root_dir)
     num_classes = len(class_names)
 
     # Transforms
@@ -115,20 +111,19 @@ def train_vein_frozen(root_dir, epochs=25, batch_size=32, n_splits=5):
                              [0.229, 0.224, 0.225])
     ])
 
-    # Stratified K-Fold
+    # Stratified K-Fold setup
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
     acc_list, prec_list, f1_list = [], [], []
 
     for fold, (train_idx, val_idx) in enumerate(skf.split(img_paths, labels)):
         print(f"\n===== Fold {fold+1}/{n_splits} =====")
 
-        train_ds = VeinDataset(img_paths[train_idx], labels[train_idx], transform=train_tf)
-        val_ds = VeinDataset(img_paths[val_idx], labels[val_idx], transform=val_tf)
-
+        train_ds = LeafDataset(img_paths[train_idx], labels[train_idx], transform=train_tf)
+        val_ds = LeafDataset(img_paths[val_idx], labels[val_idx], transform=val_tf)
         train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
         val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False)
 
-        model = VeinFrozenModel(num_classes=num_classes).to(device)
+        model = LeafFrozenModel(num_classes=num_classes).to(device)
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.Adam(model.classifier.parameters(), lr=1e-4)
 
@@ -176,7 +171,7 @@ def train_vein_frozen(root_dir, epochs=25, batch_size=32, n_splits=5):
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 stop_counter = 0
-                torch.save(model.state_dict(), f"best_vein_fold{fold+1}.pth")
+                torch.save(model.state_dict(), f"best_leaf_fold{fold+1}.pth")
             else:
                 stop_counter += 1
                 if stop_counter >= patience:
@@ -188,24 +183,23 @@ def train_vein_frozen(root_dir, epochs=25, batch_size=32, n_splits=5):
         f1_list.append(f1)
         print(f"Fold {fold+1} → Acc: {acc:.4f}, Prec: {prec:.4f}, F1: {f1:.4f}")
 
-    print("\n===== FINAL VEIN MODEL METRICS =====")
+    print("\n===== FINAL LEAF MODEL METRICS =====")
     print(f"Mean Accuracy:  {np.mean(acc_list):.4f}")
     print(f"Mean Precision: {np.mean(prec_list):.4f}")
     print(f"Mean F1 Score:  {np.mean(f1_list):.4f}")
 
-    with open("vein_results.txt", "w") as f:
-        f.write("===== FINAL VEIN MODEL METRICS =====\n")
+    with open("leaf_results.txt", "w") as f:
+        f.write("===== FINAL LEAF MODEL METRICS =====\n")
         f.write(f"Mean Accuracy:  {np.mean(acc_list):.4f}\n")
         f.write(f"Mean Precision: {np.mean(prec_list):.4f}\n")
         f.write(f"Mean F1 Score:  {np.mean(f1_list):.4f}\n")
-
 
 # ============================================================
 #                       Main Entry
 # ============================================================
 if __name__ == "__main__":
-    train_vein_frozen(
-        root_dir=r"/teamspace/studios/this_studio/Multimodal/veins_rgb",  # <-- update your path
+    train_leaf_frozen(
+        root_dir=r"/teamspace/studios/this_studio/Multimodal/leaf",  # change path
         epochs=25,
         batch_size=32,
         n_splits=5

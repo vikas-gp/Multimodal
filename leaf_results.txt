@@ -1,0 +1,4 @@
+===== FINAL LEAF MODEL METRICS =====
+Mean Accuracy:  0.8935
+Mean Precision: 0.8964
+Mean F1 Score:  0.8931
