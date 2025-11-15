@@ -9,9 +9,7 @@ from sklearn.metrics import accuracy_score, precision_score, f1_score
 from PIL import Image
 import numpy as np
 
-# ============================================================
-#                  Custom Dataset (Vein Only)
-# ============================================================
+
 class VeinDataset(Dataset):
     def __init__(self, img_paths, labels, transform=None):
         self.img_paths = img_paths
@@ -29,25 +27,19 @@ class VeinDataset(Dataset):
         return img, label
 
 
-# ============================================================
-#                    Vein Model (Frozen)
-# ============================================================
+#Vein Model
 class VeinFrozenModel(nn.Module):
     def __init__(self, num_classes):
         super(VeinFrozenModel, self).__init__()
 
-        # 1️⃣ Pretrained DenseNet121 backbone
         self.base = models.densenet121(weights=models.DenseNet121_Weights.DEFAULT)
         self.base.classifier = nn.Identity()
 
-        # Freeze all DenseNet layers
         for param in self.base.parameters():
             param.requires_grad = False
 
-        # 2️⃣ Global Average Pooling
         self.gap = nn.AdaptiveAvgPool2d((1, 1))
 
-        # 3️⃣ Classifier (Two FC layers + Output)
         self.classifier = nn.Sequential(
             nn.Linear(1024, 512),
             nn.ReLU(),
@@ -65,9 +57,7 @@ class VeinFrozenModel(nn.Module):
         return self.classifier(x)
 
 
-# ============================================================
-#                Helper: Load Vein Dataset
-# ============================================================
+
 def load_vein_dataset(root_dir):
     classes = ['healthy', 'Nitrogen', 'Potassium', 'Phosphorus', 'Sulphur', 'Zinc']
     class_to_idx = {cls.lower(): i for i, cls in enumerate(classes)}
@@ -89,9 +79,6 @@ def load_vein_dataset(root_dir):
     return np.array(img_paths), np.array(labels), classes
 
 
-# ============================================================
-#                   K-Fold Training
-# ============================================================
 def train_vein_frozen(root_dir, epochs=25, batch_size=32, n_splits=5):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -200,12 +187,9 @@ def train_vein_frozen(root_dir, epochs=25, batch_size=32, n_splits=5):
         f.write(f"Mean F1 Score:  {np.mean(f1_list):.4f}\n")
 
 
-# ============================================================
-#                       Main Entry
-# ============================================================
 if __name__ == "__main__":
     train_vein_frozen(
-        root_dir=r"/teamspace/studios/this_studio/Multimodal/veins_rgb",  # <-- update your path
+        root_dir=r"/teamspace/studios/this_studio/Multimodal/veins_rgb",
         epochs=25,
         batch_size=32,
         n_splits=5

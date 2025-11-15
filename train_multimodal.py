@@ -9,9 +9,7 @@ from torchvision import models, transforms
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 
-# ============================================================
-#                CUSTOM DATASET FOR MULTIMODAL
-# ============================================================
+#Custom Dataset for multimodal
 class MultiModalDataset(Dataset):
     def __init__(self, leaf_paths, vein_paths, labels, transform=None):
         self.leaf_paths = leaf_paths
@@ -33,19 +31,16 @@ class MultiModalDataset(Dataset):
 
         return leaf_img, vein_img, label
 
-# ============================================================
-#           BUILD FROZEN DENSENET FEATURE EXTRACTORS
-# ============================================================
+
+# Frozen Densenet Feature Extractors
 def build_frozen_densenet():
     model = models.densenet121(weights=models.DenseNet121_Weights.DEFAULT)
     for param in model.parameters():
         param.requires_grad = False
-    model.classifier = nn.Identity()  # Remove FC
+    model.classifier = nn.Identity()  # Removes classifier
     return model
 
-# ============================================================
-#                MULTIMODAL FUSION NETWORK
-# ============================================================
+# Multimodal Fusion Network
 class MultiModalFusion(nn.Module):
     def __init__(self, num_classes):
         super(MultiModalFusion, self).__init__()
@@ -68,9 +63,6 @@ class MultiModalFusion(nn.Module):
         fused = torch.cat([leaf_feat, vein_feat], dim=1)
         return self.fc_layers(fused)
 
-# ============================================================
-#                 LOAD DATASET FILES
-# ============================================================
 def load_multimodal_dataset(leaf_dir, vein_dir):
     classes = ['healthy', 'nitrogen', 'potassium', 'phosphorus', 'sulphur', 'zinc']
     class_to_idx = {cls: i for i, cls in enumerate(classes)}
@@ -111,9 +103,7 @@ def load_multimodal_dataset(leaf_dir, vein_dir):
     return np.array(leaf_paths), np.array(vein_paths), np.array(labels), classes
 
 
-# ============================================================
-#                 K-FOLD TRAINING LOGIC
-# ============================================================
+# K-Fold Training 
 def train_multimodal(leaf_dir, vein_dir, epochs=25, batch_size=16, n_splits=5):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -209,11 +199,9 @@ def train_multimodal(leaf_dir, vein_dir, epochs=25, batch_size=16, n_splits=5):
         f.write(f"Mean Precision: {np.mean(fold_prec):.6f}\n")
         f.write(f"Mean F1 Score: {np.mean(fold_f1):.6f}\n")
 
-    print("\nSaved results to multimodal_results.txt ✅")
+    print("\nSaved results to multimodal_results.txt ")
 
-# ============================================================
-#                      MAIN ENTRY
-# ============================================================
+
 if __name__ == "__main__":
     train_multimodal(
         leaf_dir=r"/teamspace/studios/this_studio/Multimodal/leaf",
